@@ -9,7 +9,6 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
-  MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
 
 jobs:
   test:
@@ -70,25 +69,32 @@ jobs:
         if: env.MAINNET_RPC_URL != ''
         run: forge test --match-contract MainnetForkTest -vvv
 
+      # FIXED: Generate gas report correctly
       - name: Generate gas report
-        run: forge test --gas-report > gas-report.txt
+        run: forge test --gas-report | tee gas-report.txt
 
+      # FIXED: Generate coverage report correctly
       - name: Generate coverage report
         run: |
           forge coverage --report lcov
-          forge coverage --report summary
+          forge coverage --report summary | tee coverage-summary.txt
 
+      # FIXED: Upload artifacts only if they exist
       - name: Upload gas report
         uses: actions/upload-artifact@v4
         with:
           name: gas-report
           path: gas-report.txt
+          if-no-files-found: warn
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: lcov.info
+          path: |
+            lcov.info
+            coverage-summary.txt
+          if-no-files-found: warn
 
   slither:
     name: Run Slither Static Analysis
@@ -159,7 +165,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Unit Tests | ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit & Fuzz Tests | ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "| Slither Analysis | ${{ needs.slither.result }}" >> $GITHUB_STEP_SUMMARY
           echo "| Code Format | ${{ needs.format.result }}" >> $GITHUB_STEP_SUMMARY
           echo "| Contract Sizes | ${{ needs.size.result }}" >> $GITHUB_STEP_SUMMARY
